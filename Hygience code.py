@@ -35,7 +35,7 @@ import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
 
-## Code Snippet to get 100 resume links
+## Code Snippet to get all yelp links
 def get_app_links():
     app_links = []
     for i in range(2): #do range(num_pages) if you want them all, here we just need two pages as each page displays 50 resumes
@@ -58,37 +58,9 @@ def get_app_links():
     return app_links
 
 app_links = get_app_links()    
-data_yelp = []
 
-url_base = 'https://www.yelp.com/biz/fog-harbor-fish-house-san-francisco-2?frvs=True&osq=Restaurants'
-source_restaurant = requests.get(url_base, timeout = 5)
-restaurant = bs4.BeautifulSoup(source_restaurant.text, 'lxml')
-details = []
-details.append(restaurant.find('h1', {'class': 'biz-page-title embossed-text-white'}).text.strip()) # Append name
-details.append(restaurant.find('span',{'class': 'neighborhood-str-list'}).string.strip()) #Append Price $$
-details.append(restaurant.find('strong', {'class': 'street-address'}).text.strip()) #Append Price $$
-details.append(restaurant.find('div',{'class': 'i-stars'})['title']) #Append Stars Rating
-details.append(restaurant.find('span',{'class': 'review-count rating-qualifier'}).string[13:17]) #Append Stars Rating
-details.append(restaurant.find('span',{'class': 'business-attribute price-range'}).string) #Append Price $$
-details.append(restaurant.find('dd',{'class': 'nowrap price-description'}).string.strip()) #Append Price $$
-details.append(restaurant.find('span',{'class': 'category-str-list'}).text.strip()) #Append Price $$
-details.append(restaurant.find('div',{'class': 'score-block'}).string.strip()) #Append Stars Rating
-details.append(restaurant.find('dt',{'class': 'attribute-key'}).text.strip()) #Append Stars Rating
-print(details)
-restaurant.find('div',{'class': 'short-def-list'},)
-
-<span class="category-str-list">
-                    <a href="/c/sf/vietnamese">Vietnamese</a>,
-                    <a href="/c/sf/sandwiches">Sandwiches</a>
-    </span>
-
-
-
-restaurant.find('div',{'class': 'i-stars'})['title']
-restaurant.find('h1', {'class': 'biz-page-title embossed-text-white'}).text.strip()
-<span class="review-count rating-qualifier">
-            3838 reviews
-    </span>
+## Snippet to get Restaurant Info
+data = []
 def get_info(app_links):
     num = 0
     for app_link in app_links:
@@ -160,6 +132,102 @@ def get_info(app_links):
         data.append(details)
         print("Finished collecting information for resume #{}".format(num))
         
+# Snippet to get all the reviews and stats
+## To run the function. We need to create empty lists first:
+rest_names_list = []
+rating_list = []
+user_id_list = []
+review_id_list = []
+text_list = []
+dates_list = []
+
+def get_reviews_info(app_links):
+    num1 = 0
+    num2 = 0
+    for app_link in app_links:
+        num1 += 1
+        print("Collecting info of the restaurant #{}".format(num1))
+             # rest with most reviews have 436 pages
+        url_base = 'http://www.yelp.com'
+        url_base += app_link[:-26] + '?start=' + str(1)
+        source_restaurant = requests.get(url_base)
+        time.sleep(0.2 + 0.5 * random.randint(1, 30))
+        restaurant = bs4.BeautifulSoup(source_restaurant.text, 'lxml')
+       
+        try:
+            pages_no = restaurant.find('div',{'class':'page-of-pages arrange_unit arrange_unit--fill'}).text.strip()
+        except:
+            continue
+        #### Restaurant Names
+        rest_names = []
+        try:
+            try:
+                rest_name = restaurant.find(('div', {'class': 'u-space-t1'}) and 'h1').text.strip()
+                rest_names.append([rest_name]*int(restaurant.find('span',{'class': 'review-count rating-qualifier'}).text.strip()[:-7]))
+            except:
+                rest_name = restaurant.find('h1', {'class': 'biz-page-title embossed-text-white'}).text.strip()
+                rest_names.append([rest_name]*int(restaurant.find('span',{'class': 'review-count rating-qualifier'}).text.strip()[:-7]))
+        except:
+            try:
+                rest_names.append(['NIL']*int(restaurant.find('span',{'class': 'review-count rating-qualifier'}).text.strip()[:-7]))
+            except:
+                continue
+                
+        rest_names_list.append(rest_names)
+        
+        if len(pages_no) > 11:
+            for j in range(int(pages_no[-3:])):
+                url_base2 = 'http://www.yelp.com'
+                url_base2 += app_link[:-26] + '?start=' + str(j*20)
+                source_restaurant2 = requests.get(url_base2)
+            
+                num2 += 1
+                print("Crawling info of #{} pages of the restaurant ".format(num2))                
+                time.sleep(0.2 + 0.4 * random.randint(1, 35))
+        
+                reviews = bs4.BeautifulSoup(source_restaurant2.text, 'lxml')
+            
+                review_id = []          #All review ids
+                for x in reviews.findAll('div', {'class': 'review review--with-sidebar'}):
+                    try:
+                        review_id.append(x['data-review-id'])
+                    except:
+                        review_id.append('NIL')
+                text = []
+                for x in reviews.findAll('p', {'lang': 'en'}): #All reviews text
+                    try:
+                        text.append(x.text.strip())
+                    except:
+                        text.append('NIL')
+                dates = []
+                for x in reviews.findAll('div',{'class': 'review-content'}):
+                    try: 
+                        a = x.find('span',{'class': 'rating-qualifier'})
+                        dates.append(a.text.strip())
+                    except:
+                        dates.append('NIL')
+                rating = []
+                for x in reviews.findAll('div',{'class': 'review-content'}): #All Stars ratings
+                    try: 
+                        a= x.find('div',{'class': 'i-stars'})['title']
+                        rating.append(a[0:3])  
+                    except:
+                        rating.append('NIL')
+                user_id = []
+                for x in reviews.findAll('li', {'class': 'user-name'}):   #All user names in one pages
+                    try: 
+                        user_id.append(x.text.strip())
+                    except:
+                        user_id.append('NIL')
+                
+                review_id_list.append(review_id)
+                text_list.append(text)
+                dates_list.append(dates)
+                rating_list.append(rating)
+                user_id_list.append(user_id)
+
+
+
 
     
 
